@@ -1,47 +1,83 @@
 package com.sena.security.service;
 
+import com.sena.security.dto.TicketEstadoRequest;
+import com.sena.security.dto.TicketRequest;
+import com.sena.security.exception.TicketNotFoundException;
+import com.sena.security.model.Role;
 import com.sena.security.model.Ticket;
+import com.sena.security.model.User;
 import com.sena.security.model.enums.Estado;
 import com.sena.security.repository.TicketRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class TicketsService {
-    
-    @Autowired
-    private TicketRepository ticketRepository;
 
-    public Ticket crearTicket (Ticket ticket){
+    private final TicketRepository ticketRepository;
 
-        ticket.setCreadoEn(LocalDateTime.now());
+    public Ticket crearTicket(TicketRequest request, User creadoPor) {
+        LocalDateTime ahora = LocalDateTime.now();
 
-            ticket.setEstado(Estado.ABIERTO);
-
-        int horasSla = switch (ticket.getPrioridad()){
+        int horasSla = switch (request.prioridad()) {
             case ALTA -> 4;
             case MEDIA -> 24;
             case BAJA -> 72;
         };
 
-        ticket.setSlaVenceEn(ticket.getCreadoEn().plusHours(horasSla));
+        Ticket ticket = Ticket.builder()
+                .titulo(request.titulo())
+                .descripcion(request.descripcion())
+                .prioridad(request.prioridad())
+                .estado(Estado.ABIERTO)
+                .creadoEn(ahora)
+                .slaVenceEn(ahora.plusHours(horasSla))
+                .creadoPor(creadoPor)
+                .build();
 
         return ticketRepository.save(ticket);
-
     }
 
-    // Regla de negocio: SI un ticket se vence y supera la fecha SLA y no está terminado se renueva
+    public List<Ticket> listarMios(User usuario) {
+        return ticketRepository.findByCreadoPor(usuario);
+    }
 
-    public boolean isTicketVencido(Long ticketId){
+    public List<Ticket> listarTodos() {
+        return ticketRepository.findAll();
+    }
 
-        Ticket ticket =  ticketRepository.findById(ticketId).orElseThrow(() -> new RuntimeException("Ticket no encontrado"));
+    public List<Ticket> listarVencidos() {
+        return ticketRepository.findAll().stream()
+                .filter(Ticket::isVencido)
+                .toList();
+    }
 
-        if(ticket.getEstado() == Estado.RESUELTO){
-            return false;
+    public Ticket obtenerPorId(Long id, User solicitante) {
+        Ticket ticket = buscarOFallar(id);
+
+        boolean esDueno = ticket.getCreadoPor().getId().equals(solicitante.getId());
+        boolean tienePermisoAmpliado = solicitante.getRole() == Role.SOPORTE || solicitante.getRole() == Role.ADMIN;
+
+        if (!esDueno && !tienePermisoAmpliado) {
+            throw new AccessDeniedException("No puede consultar tickets de otros usuarios");
         }
-        return LocalDateTime.now().isAfter(ticket.getSlaVenceEn());
+
+        return ticket;
     }
 
+    public Ticket cambiarEstado(Long id, TicketEstadoRequest request) {
+        Ticket ticket = buscarOFallar(id);
+        ticket.setEstado(request.estado());
+        return ticketRepository.save(ticket);
+    }
+
+    private Ticket buscarOFallar(Long id) {
+        return ticketRepository.findById(id)
+                .orElseThrow(() -> new TicketNotFoundException(id));
+    }
 }

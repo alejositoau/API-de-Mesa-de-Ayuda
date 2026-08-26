@@ -17,18 +17,18 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (!userRepository.existsByUsername("admin")) {
+        seedIfMissing("Administrador", "admin@mesadeayuda.com", "admin123", Role.ADMIN);
+        seedIfMissing("Agente de Soporte", "soporte@mesadeayuda.com", "soporte123", Role.SOPORTE);
+        seedIfMissing("Usuario Demo", "usuario@mesadeayuda.com", "usuario123", Role.USUARIO);
+    }
+
+    private void seedIfMissing(String nombre, String email, String password, Role role) {
+        if (!userRepository.existsByEmail(email)) {
             userRepository.save(User.builder()
-                    .username("admin")
-                    .password(passwordEncoder.encode("admin123"))
-                    .role(Role.ADMIN)
-                    .build());
-        }
-        if (!userRepository.existsByUsername("user")) {
-            userRepository.save(User.builder()
-                    .username("user")
-                    .password(passwordEncoder.encode("user123"))
-                    .role(Role.USER)
+                    .nombre(nombre)
+                    .email(email)
+                    .password(passwordEncoder.encode(password))
+                    .role(role)
                     .build());
         }
     }

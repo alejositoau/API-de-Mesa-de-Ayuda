@@ -31,7 +31,7 @@ public class Ticket {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Estado estado = Estado.ABIERTO;
+    private Estado estado;
 
     @Column(name = "creado_en", nullable = false, updatable = false)
     private LocalDateTime creadoEn;
@@ -39,15 +39,15 @@ public class Ticket {
     @Column(name = "sla_vence_en")
     private LocalDateTime slaVenceEn;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User creadoPor;
 
-    @PrePersist
-    protected void onCreate() {
-        this.creadoEn = LocalDateTime.now();
-        if (this.estado == null) {
-            this.estado = Estado.ABIERTO;
+    @Transient
+    public boolean isVencido() {
+        if (this.estado == Estado.RESUELTO || this.slaVenceEn == null) {
+            return false;
         }
+        return LocalDateTime.now().isAfter(this.slaVenceEn);
     }
 }

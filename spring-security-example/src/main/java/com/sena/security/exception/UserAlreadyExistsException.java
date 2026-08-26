@@ -1,7 +1,7 @@
 package com.sena.security.exception;
 
 public class UserAlreadyExistsException extends RuntimeException {
-    public UserAlreadyExistsException(String username) {
-        super("El usuario ya existe: " + username);
+    public UserAlreadyExistsException(String email) {
+        super("El email ya está registrado: " + email);
     }
 }

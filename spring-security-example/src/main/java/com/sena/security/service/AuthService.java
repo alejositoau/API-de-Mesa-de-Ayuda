@@ -29,14 +29,15 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.username())) {
-            throw new UserAlreadyExistsException(request.username());
+        if (userRepository.existsByEmail(request.email())) {
+            throw new UserAlreadyExistsException(request.email());
         }
 
         User user = userRepository.save(User.builder()
-                .username(request.username())
+                .nombre(request.nombre())
+                .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
-                .role(Role.USER)
+                .role(Role.USUARIO) // todo registro público entra como USUARIO
                 .build());
 
         return buildAuthResponse(user);
@@ -44,41 +45,36 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password())
+                new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
 
-        User user = userRepository.findByUsername(request.username())
+        User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new IllegalStateException("Usuario no encontrado tras autenticación"));
 
         return buildAuthResponse(user);
     }
-    
+
     public AuthResponse refresh(RefreshRequest request) {
         RefreshToken oldToken = refreshTokenService.verifyRefreshToken(request.refreshToken());
         User user = oldToken.getUser();
 
-        // Rotar: revocar el token usado y emitir uno nuevo
         oldToken.setRevoked(true);
         RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user);
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String newAccessToken = jwtService.generateToken(userDetails);
 
         return new AuthResponse(newAccessToken, newRefreshToken.getToken());
     }
 
-    /**
-     * Invalida todos los refresh tokens del usuario (logout en todos los dispositivos).
-     */
-    public void logout(RefreshRequest request) {
-        RefreshToken token = refreshTokenService.verifyRefreshToken(request.refreshToken());
-        refreshTokenService.revokeAllTokens(token.getUser());
+    public void logout(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Usuario no encontrado"));
+        refreshTokenService.revokeAllTokens(user);
     }
 
-    // -----------------------------------------------------------------------
-
     private AuthResponse buildAuthResponse(User user) {
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String accessToken = jwtService.generateToken(userDetails);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
         return new AuthResponse(accessToken, refreshToken.getToken());

@@ -18,13 +18,9 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
 
-    @Value("${app.jwt.refresh-expiration-ms:604800000}") // 7 días por defecto
+    @Value("${app.jwt.refresh-expiration-ms:604800000}") 
     private long refreshExpirationMs;
 
-    /**
-     * Crea y persiste un nuevo refresh token para el usuario.
-     * Revoca los anteriores del mismo usuario para evitar acumulación.
-     */
     @Transactional
     public RefreshToken createRefreshToken(User user) {
         refreshTokenRepository.revokeAllByUser(user);
@@ -38,10 +34,6 @@ public class RefreshTokenService {
         return refreshTokenRepository.save(refreshToken);
     }
 
-    /**
-     * Verifica que el token exista, no esté revocado y no haya expirado.
-     * Si expiró, lo revoca en BD y lanza excepción.
-     */
     @Transactional
     public RefreshToken verifyRefreshToken(String token) {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
@@ -60,9 +52,6 @@ public class RefreshTokenService {
         return refreshToken;
     }
 
-    /**
-     * Revoca todos los refresh tokens del usuario (logout).
-     */
     @Transactional
     public void revokeAllTokens(User user) {
         refreshTokenRepository.revokeAllByUser(user);
